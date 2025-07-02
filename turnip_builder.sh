@@ -59,6 +59,8 @@ prepare_workdir(){
 	echo "Exracting mesa source ..." $'\n'
 		unzip mesa-main.zip &> /dev/null
 		cd mesa-main
+  git apply ../experimental-ad710-support.patch
+
 }
 
 
