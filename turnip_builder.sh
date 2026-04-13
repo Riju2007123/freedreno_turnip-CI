@@ -59,7 +59,14 @@ prepare_workdir(){
 	echo "Exracting mesa source ..." $'\n'
 		unzip mesa-main.zip &> /dev/null
 		cd mesa-main
-  git apply ../experimental-ad710-support.patch
+  echo "Applying patches..."
+
+  for p in ../*.patch; do
+     if [ -f "$p" ]; then
+       echo "Applying $p"
+       git apply "$p"
+     fi
+   done
 
 }
 
