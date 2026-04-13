@@ -19,6 +19,7 @@ jobs:
           PREVIOUS=$(git tag --sort=-creatordate | grep -A1 "$CURRENT" | tail -n1)
 
           FILES=$(git diff --name-only "$PREVIOUS" "$CURRENT" \
+            | grep -v '^\.github' \
             | cut -d/ -f1 \
             | sort | uniq \
             | head -n 6)
