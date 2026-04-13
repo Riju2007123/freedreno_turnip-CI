@@ -7,62 +7,43 @@ on:
 jobs:
   notify:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
-      - name: Generate changelog
+      - name: Get affected areas
         id: log
         run: |
-          SUMMARY=$(git log -1 --pretty=format:"%s")
+          CURRENT="${{ github.event.release.tag_name }}"
+          PREVIOUS=$(git tag --sort=-creatordate | grep -A1 "$CURRENT" | tail -n1)
 
-          if [ -z "$SUMMARY" ]; then
-            SUMMARY="Minor internal update"
-          fi
-
-          FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null \
-            | grep -vE '^\.github|^\.vscode' \
+          FILES=$(git diff --name-only "$PREVIOUS" "$CURRENT" \
             | cut -d/ -f1 \
-            | sort | uniq)
+            | sort | uniq \
+            | head -n 6)
 
           if [ -z "$FILES" ]; then
-            FILE_LIST="• internal"
+            OUTPUT="🛠 Minor internal updates"
           else
-            FILE_LIST=$(echo "$FILES" | sed 's/^/• /')
+            OUTPUT="📂 Areas affected:\n$(echo "$FILES" | sed 's/^/• /')"
           fi
-
-          OUTPUT=$(printf "• %s\n\n📂 Areas affected:\n%s" "$SUMMARY" "$FILE_LIST")
 
           echo "text<<EOF" >> $GITHUB_OUTPUT
           echo "$OUTPUT" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Send to Discord
-        env:
-          NAME: ${{ github.event.release.name }}
-          TAG: ${{ github.event.release.tag_name }}
-          URL: ${{ github.event.release.html_url }}
-          BODY: ${{ steps.log.outputs.text }}
         run: |
-          echo "Sending message..."
-
-          PAYLOAD=$(jq -n \
-            --arg name "$NAME" \
-            --arg tag "$TAG" \
-            --arg url "$URL" \
-            --arg body "$BODY" \
+          jq -n \
+            --arg name "${{ github.event.release.name }}" \
+            --arg tag "${{ github.event.release.tag_name }}" \
+            --arg url "${{ github.event.release.html_url }}" \
+            --arg body "${{ steps.log.outputs.text }}" \
             '{
               content:
-              "🚀 " + $name + "\n📦 Version: " + $tag + "\n\n" +
-              (if $body == "" then "🛠 Minor internal update" else $body end) +
-              "\n\n🔗 " + $url
-            }')
-
-          echo "$PAYLOAD"
-
-          curl -H "Content-Type: application/json" \
-               -d "$PAYLOAD" \
-               "${{ secrets.DISCORD_WEBHOOK }}"
+              "🚀 **\($name)**\n📦 Version: \($tag)\n\n\($body)\n\n🔗 \($url)"
+            }' \
+          | curl -H "Content-Type: application/json" \
+                 -d @- \
+                 "${{ secrets.DISCORD_WEBHOOK }}"
