@@ -1,0 +1,75 @@
+name: Discord Notify
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: log
+        run: |
+          CURRENT="${{ github.event.release.tag_name }}"
+
+          # Get previous tag safely
+          TAGS=($(git tag --sort=-creatordate))
+          PREVIOUS=""
+
+          for ((i=0; i<${#TAGS[@]}; i++)); do
+            if [ "${TAGS[$i]}" = "$CURRENT" ]; then
+              PREVIOUS="${TAGS[$i+1]}"
+              break
+            fi
+          done
+
+          # If no previous tag → first release
+          if [ -z "$PREVIOUS" ]; then
+            OUTPUT="🎉 Initial release"
+          else
+            COMMITS=$(git log "$PREVIOUS..$CURRENT" --pretty=format:"- %s" | head -n 3)
+
+            FILES=$(git diff --name-only "$PREVIOUS" "$CURRENT" \
+              | grep -vE '^\.github|^\.vscode' \
+              | cut -d/ -f1 \
+              | sort | uniq \
+              | head -n 5)
+
+            FILE_LIST=$(echo "$FILES" | sed 's/^/• /')
+
+            if [ -z "$COMMITS" ]; then
+              OUTPUT="🛠 Minor internal updates"
+            else
+              OUTPUT="$COMMITS
+
+📂 Areas affected:
+$FILE_LIST"
+            fi
+          fi
+
+          echo "text<<EOF" >> $GITHUB_OUTPUT
+          echo "$OUTPUT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Send to Discord
+        run: |
+          jq -n \
+            --arg name "${{ github.event.release.name }}" \
+            --arg tag "${{ github.event.release.tag_name }}" \
+            --arg url "${{ github.event.release.html_url }}" \
+            --arg body "${{ steps.log.outputs.text }}" \
+            '{
+              content:
+              "🚀 **\($name)**\n📦 Version: \($tag)\n\n" +
+              $body +
+              "\n\n🔗 " + $url
+            }' \
+          | curl -H "Content-Type: application/json" \
+                 -d @- \
+                 "${{ secrets.DISCORD_WEBHOOK }}"
