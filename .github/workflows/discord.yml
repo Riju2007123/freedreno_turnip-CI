@@ -7,18 +7,18 @@ on:
 jobs:
   notify:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Generate changelog
+      - name: Generate clean changelog
         id: log
         run: |
           CURRENT="${{ github.event.release.tag_name }}"
 
-          # Get previous tag safely
           TAGS=($(git tag --sort=-creatordate))
           PREVIOUS=""
 
@@ -29,29 +29,26 @@ jobs:
             fi
           done
 
-          # If no previous tag → first release
-          if [ -z "$PREVIOUS" ]; then
-            OUTPUT="🎉 Initial release"
-          else
-            COMMITS=$(git log "$PREVIOUS..$CURRENT" --pretty=format:"- %s" | head -n 3)
+          # ONE clean commit line
+          SUMMARY=$(git log "$PREVIOUS..$CURRENT" --pretty=format:"%s" | head -n 1)
 
-            FILES=$(git diff --name-only "$PREVIOUS" "$CURRENT" \
-              | grep -vE '^\.github|^\.vscode' \
-              | cut -d/ -f1 \
-              | sort | uniq \
-              | head -n 5)
+          if [ -z "$SUMMARY" ]; then
+            SUMMARY="Minor internal update"
+          fi
 
-            FILE_LIST=$(echo "$FILES" | sed 's/^/• /')
+          # Clean file areas
+          FILES=$(git diff --name-only "$PREVIOUS" "$CURRENT" \
+            | grep -vE '^\.github|^\.vscode' \
+            | cut -d/ -f1 \
+            | sort | uniq \
+            | head -n 3)
 
-            if [ -z "$COMMITS" ]; then
-              OUTPUT="🛠 Minor internal updates"
-            else
-              OUTPUT="$COMMITS
+          FILE_LIST=$(echo "$FILES" | sed 's/^/• /')
+
+          OUTPUT="• $SUMMARY
 
 📂 Areas affected:
 $FILE_LIST"
-            fi
-          fi
 
           echo "text<<EOF" >> $GITHUB_OUTPUT
           echo "$OUTPUT" >> $GITHUB_OUTPUT
@@ -66,7 +63,7 @@ $FILE_LIST"
             --arg body "${{ steps.log.outputs.text }}" \
             '{
               content:
-              "🚀 **\($name)**\n📦 Version: \($tag)\n\n" +
+              "🚀 " + $name + "\n📦 Version: " + $tag + "\n\n" +
               $body +
               "\n\n🔗 " + $url
             }' \
