@@ -7,6 +7,7 @@ on:
 jobs:
   notify:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -23,23 +24,25 @@ jobs:
           FILES=$(echo "$ALL_FILES" \
             | grep -v '^\.github' \
             | cut -d/ -f1 \
-            | sort | uniq \
+            | sort -u \
             | head -n 6)
 
           if [ -z "$FILES" ]; then
-             if echo "$ALL_FILES" | grep -q '^\.github'; then
-               OUTPUT="⚙️ Workflow updated"
-             else
-               OUTPUT="🛠 Minor internal updates"
-             fi
+            if echo "$ALL_FILES" | grep -q '^\.github'; then
+              OUTPUT="⚙️ Workflow updated"
+            else
+              OUTPUT="🛠 Minor internal updates"
+            fi
           else
             FILE_LIST=$(echo "$FILES" | sed 's/^/• /')
             OUTPUT=$(printf "📂 Areas affected:\n%s" "$FILE_LIST")
           fi
 
-          echo "text<<EOF" >> $GITHUB_OUTPUT
-          echo "$OUTPUT" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          {
+            echo "text<<EOF"
+            echo "$OUTPUT"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Send to Discord
         run: |
@@ -52,6 +55,6 @@ jobs:
               content:
               "🚀 **\($name)**\n📦 Version: \($tag)\n\n\($body)\n\n🔗 \($url)"
             }' \
-          | curl -H "Content-Type: application/json" \
+          | curl -s -H "Content-Type: application/json" \
                  -d @- \
                  "${{ secrets.DISCORD_WEBHOOK }}"
