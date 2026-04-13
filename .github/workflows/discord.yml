@@ -9,50 +9,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-
-      - name: Generate clean changelog
-        id: log
-        run: |
-          SUMMARY=$(git log -1 --pretty=format:"%s")
-
-          if [ -z "$SUMMARY" ]; then
-            SUMMARY="Minor internal update"
-          fi
-
-          FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null \
-            | grep -vE '^\.github|^\.vscode' \
-            | cut -d/ -f1 \
-            | sort | uniq)
-
-          if [ -z "$FILES" ]; then
-            FILE_LIST="• internal"
-          else
-            FILE_LIST=$(echo "$FILES" | sed 's/^/• /')
-          fi
-
-          OUTPUT=$(printf "• %s\n\n📂 Areas affected:\n%s" "$SUMMARY" "$FILE_LIST")
-
-          echo "text<<EOF" >> $GITHUB_OUTPUT
-          echo "$OUTPUT" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
       - name: Send to Discord
-        run: |
-          jq -n \
-            --arg name "${{ github.event.release.name }}" \
-            --arg tag "${{ github.event.release.tag_name }}" \
-            --arg url "${{ github.event.release.html_url }}" \
-            --arg body "${{ steps.log.outputs.text }}" \
-            '{
-              content:
-              "🚀 " + $name + "\n📦 Version: " + $tag + "\n\n" +
-              $body +
-              "\n\n🔗 " + $url
-            }' \
-          | curl -H "Content-Type: application/json" \
-                 -d @- \
-                 "${{ secrets.DISCORD_WEBHOOK }}"
+  run: |
+    echo "Sending Discord message..."
+
+    PAYLOAD=$(jq -n \
+      --arg name "${{ github.event.release.name }}" \
+      --arg tag "${{ github.event.release.tag_name }}" \
+      --arg url "${{ github.event.release.html_url }}" \
+      --arg body "${{ steps.log.outputs.text }}" \
+      '{
+        content:
+        "🚀 " + $name + "\n📦 Version: " + $tag + "\n\n" +
+        (if $body == "" then "🛠 Minor internal update" else $body end) +
+        "\n\n🔗 " + $url
+      }')
+
+    echo "Payload:"
+    echo "$PAYLOAD"
+
+    RESPONSE=$(curl -s -w "%{http_code}" -o response.txt \
+      -H "Content-Type: application/json" \
+      -d "$PAYLOAD" \
+      "${{ secrets.DISCORD_WEBHOOK }}")
+
+    echo "HTTP Response: $RESPONSE"
+    echo "Response body:"
+    cat response.txt
+               
