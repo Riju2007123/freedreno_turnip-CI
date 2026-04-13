@@ -12,38 +12,29 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 2   # only need recent commits
 
       - name: Generate clean changelog
         id: log
         run: |
-          CURRENT="${{ github.event.release.tag_name }}"
-
-          TAGS=($(git tag --sort=-creatordate))
-          PREVIOUS=""
-
-          for ((i=0; i<${#TAGS[@]}; i++)); do
-            if [ "${TAGS[$i]}" = "$CURRENT" ]; then
-              PREVIOUS="${TAGS[$i+1]}"
-              break
-            fi
-          done
-
-          # ONE clean commit line
-          SUMMARY=$(git log "$PREVIOUS..$CURRENT" --pretty=format:"%s" | head -n 1)
+          # Get latest commit message only (safe)
+          SUMMARY=$(git log -1 --pretty=format:"%s")
 
           if [ -z "$SUMMARY" ]; then
             SUMMARY="Minor internal update"
           fi
 
-          # Clean file areas
-          FILES=$(git diff --name-only "$PREVIOUS" "$CURRENT" \
+          # Get changed folders from last commit (safe)
+          FILES=$(git diff --name-only HEAD~1 HEAD \
             | grep -vE '^\.github|^\.vscode' \
             | cut -d/ -f1 \
-            | sort | uniq \
-            | head -n 3)
+            | sort | uniq)
 
-          FILE_LIST=$(echo "$FILES" | sed 's/^/• /')
+          if [ -z "$FILES" ]; then
+            FILE_LIST="• internal"
+          else
+            FILE_LIST=$(echo "$FILES" | sed 's/^/• /')
+          fi
 
           OUTPUT="• $SUMMARY
 
