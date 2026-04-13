@@ -26,7 +26,8 @@ jobs:
           if [ -z "$FILES" ]; then
             OUTPUT="🛠 Minor internal updates"
           else
-            OUTPUT="📂 Areas affected:\n$(echo "$FILES" | sed 's/^/• /')"
+            FILE_LIST=$(echo "$FILES" | sed 's/^/• /')
+            OUTPUT=$(printf "📂 Areas affected:\n%s" "$FILE_LIST")
           fi
 
           echo "text<<EOF" >> $GITHUB_OUTPUT
