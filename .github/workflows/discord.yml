@@ -18,14 +18,20 @@ jobs:
           CURRENT="${{ github.event.release.tag_name }}"
           PREVIOUS=$(git tag --sort=-creatordate | grep -A1 "$CURRENT" | tail -n1)
 
-          FILES=$(git diff --name-only "$PREVIOUS" "$CURRENT" \
+          ALL_FILES=$(git diff --name-only "$PREVIOUS" "$CURRENT")
+
+          FILES=$(echo "$ALL_FILES" \
             | grep -v '^\.github' \
             | cut -d/ -f1 \
             | sort | uniq \
             | head -n 6)
 
           if [ -z "$FILES" ]; then
-            OUTPUT="🛠 Minor internal updates"
+             if echo "$ALL_FILES" | grep -q '^\.github'; then
+               OUTPUT="⚙️ Workflow updated"
+             else
+               OUTPUT="🛠 Minor internal updates"
+             fi
           else
             FILE_LIST=$(echo "$FILES" | sed 's/^/• /')
             OUTPUT=$(printf "📂 Areas affected:\n%s" "$FILE_LIST")
