@@ -1,0 +1,7 @@
+diff --git a/CI_TEST.txt b/CI_TEST.txt
+new file mode 100644
+index 0000000..e69de29
+--- /dev/null
++++ b/CI_TEST.txt
+@@
++Turnip CI patch applied successfully!
