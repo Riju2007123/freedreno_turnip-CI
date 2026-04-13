@@ -12,20 +12,18 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2   # only need recent commits
+          fetch-depth: 2
 
       - name: Generate clean changelog
         id: log
         run: |
-          # Get latest commit message only (safe)
           SUMMARY=$(git log -1 --pretty=format:"%s")
 
           if [ -z "$SUMMARY" ]; then
             SUMMARY="Minor internal update"
           fi
 
-          # Get changed folders from last commit (safe)
-          FILES=$(git diff --name-only HEAD~1 HEAD \
+          FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null \
             | grep -vE '^\.github|^\.vscode' \
             | cut -d/ -f1 \
             | sort | uniq)
@@ -36,10 +34,7 @@ jobs:
             FILE_LIST=$(echo "$FILES" | sed 's/^/• /')
           fi
 
-          OUTPUT="• $SUMMARY
-
-📂 Areas affected:
-$FILE_LIST"
+          OUTPUT=$(printf "• %s\n\n📂 Areas affected:\n%s" "$SUMMARY" "$FILE_LIST")
 
           echo "text<<EOF" >> $GITHUB_OUTPUT
           echo "$OUTPUT" >> $GITHUB_OUTPUT
